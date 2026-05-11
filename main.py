@@ -1,20 +1,16 @@
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 import requests
 import os
 import urllib.parse
 
 app = FastAPI()
 
-# 🎵 (선택) 음악/이미지 static
-
-
 NEIS_KEY = os.getenv("NEIS_KEY")
 
 
 # -----------------------------
-# 학교 정보 가져오기
+# 학교 정보
 # -----------------------------
 def get_school(name: str):
 
@@ -38,7 +34,6 @@ def get_school(name: str):
             return None
 
         row = rows[0]
-
         address = row.get("ORG_RDNMA")
 
         return {
@@ -47,19 +42,62 @@ def get_school(name: str):
             "office": row.get("ATPT_OFCDC_SC_NM"),
             "type": row.get("SCHUL_KND_SC_NM"),
 
-            # 🖼 이미지 (무료 이미지 API)
+            # 🖼 이미지
             "img": f"https://source.unsplash.com/600x400/?school,{name}",
 
-            # 🗺 지도 링크
+            # 🗺 지도
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
 
-            # 📱 QR 코드 (Google Chart API)
+            # 📱 QR
             "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={urllib.parse.quote(address)}"
-
         }
 
     except:
         return None
+
+
+# -----------------------------
+# 자동완성 API
+# -----------------------------
+@app.get("/auto")
+def auto(q: str):
+
+    url = "https://open.neis.go.kr/hub/schoolInfo"
+
+    res = requests.get(url, params={
+        "KEY": NEIS_KEY,
+        "Type": "json",
+        "SCHUL_NM": q
+    })
+
+    try:
+        data = res.json().get("schoolInfo")
+
+        if not data:
+            return {"data": []}
+
+        rows = data[1].get("row", [])
+
+        return {
+            "data": [r.get("SCHUL_NM") for r in rows[:5]]
+        }
+
+    except:
+        return {"data": []}
+
+
+# -----------------------------
+# 검색 API
+# -----------------------------
+@app.get("/api")
+def api(name: str):
+
+    data = get_school(name)
+
+    if not data:
+        return {"result": False}
+
+    return {"result": True, "data": data}
 
 
 # -----------------------------
@@ -113,6 +151,11 @@ img {
     width: 100%;
     border-radius: 10px;
 }
+
+.auto {
+    cursor: pointer;
+    color: blue;
+}
 </style>
 </head>
 
@@ -122,16 +165,40 @@ img {
 
 <h2>🏫 AI 학교 검색</h2>
 
-<input id="name" placeholder="학교 이름 입력">
+<input id="name" oninput="auto()" placeholder="학교 입력">
 <br>
 <button onclick="search()">검색</button>
 
+<div id="autoBox"></div>
 <div id="result"></div>
 
 </div>
 
 <script>
 
+// 🔎 자동완성
+async function auto() {
+
+    const q = document.getElementById("name").value;
+
+    if (q.length < 2) return;
+
+    const res = await fetch(`/auto?q=${q}`);
+    const data = await res.json();
+
+    const box = document.getElementById("autoBox");
+
+    box.innerHTML = data.data.map(n => `
+        <p class="auto" onclick="select('${n}')">🔎 ${n}</p>
+    `).join("");
+}
+
+function select(name) {
+    document.getElementById("name").value = name;
+}
+
+
+// 🔍 검색
 async function search() {
 
     const name = document.getElementById("name").value;
@@ -153,21 +220,16 @@ async function search() {
 
             <h2>🏫 ${s.name}</h2>
 
-            <!-- 🖼 이미지 -->
             <img src="${s.img}">
 
             <p>📍 ${s.address}</p>
             <p>🏢 ${s.office}</p>
             <p>🎓 ${s.type}</p>
 
-            <!-- 🗺 지도 -->
-            <a href="${s.map}" target="_blank">
-                🗺 지도 보기
-            </a>
+            <a href="${s.map}" target="_blank">🗺 지도 보기</a>
 
             <br><br>
 
-            <!-- 📱 QR -->
             <img src="${s.qr}" style="width:150px">
 
         </div>
@@ -179,20 +241,3 @@ async function search() {
 </body>
 </html>
 """
-
-
-# -----------------------------
-# API
-# -----------------------------
-@app.get("/api")
-def api(name: str):
-
-    data = get_school(name)
-
-    if not data:
-        return {"result": False}
-
-    return {
-        "result": True,
-        "data": data
-    }
