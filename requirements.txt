@@ -3,4 +3,3 @@ uvicorn
 requests
 qrcode
 pillow
-python-dotenv
