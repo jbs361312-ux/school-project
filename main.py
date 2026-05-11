@@ -8,9 +8,12 @@ app = FastAPI()
 
 NEIS_KEY = os.getenv("NEIS_KEY")
 
+# 🌐 너 사이트 주소 (여기만 꼭 바꿔!)
+BASE_URL = "https://school-project-lowd.onrender.com"
+
 
 # -----------------------------
-# 학교 정보
+# 학교 정보 API
 # -----------------------------
 def get_school(name: str):
 
@@ -45,8 +48,8 @@ def get_school(name: str):
             # 🗺 지도
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
 
-            # 📱 QR
-            "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={urllib.parse.quote(address)}"
+            # 📱 QR → 홈페이지 접속
+            "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={BASE_URL}"
         }
 
     except:
@@ -54,7 +57,7 @@ def get_school(name: str):
 
 
 # -----------------------------
-# 자동완성
+# 자동완성 API
 # -----------------------------
 @app.get("/auto")
 def auto(q: str):
@@ -84,7 +87,7 @@ def auto(q: str):
 
 
 # -----------------------------
-# API
+# 검색 API
 # -----------------------------
 @app.get("/api")
 def api(name: str):
@@ -112,22 +115,20 @@ def home():
 
 <style>
 
-/* 🌄 고정 공부 배경 */
 body {
     font-family: sans-serif;
     margin: 0;
-    padding: 0;
     height: 100vh;
 
+    /* 🌄 공부 배경 */
     background-image: url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
 }
 
-/* 반투명 카드 */
 .box {
-    background: rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.92);
     padding: 25px;
     border-radius: 15px;
     width: 450px;
@@ -143,7 +144,6 @@ input {
 button {
     padding: 10px 20px;
     margin-top: 10px;
-    cursor: pointer;
 }
 
 .card {
@@ -228,6 +228,7 @@ async function search() {
 
             <br><br>
 
+            <!-- 📱 QR (홈페이지 접속) -->
             <img src="${s.qr}" style="width:150px">
 
         </div>
