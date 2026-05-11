@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 import requests
 import os
 import urllib.parse
+import random
 
 app = FastAPI()
 
@@ -25,12 +26,10 @@ def get_school(name: str):
 
     try:
         data = res.json().get("schoolInfo")
-
         if not data:
             return None
 
         rows = data[1].get("row", [])
-
         if not rows:
             return None
 
@@ -42,11 +41,7 @@ def get_school(name: str):
             "address": address,
             "office": row.get("ATPT_OFCDC_SC_NM"),
             "type": row.get("SCHUL_KND_SC_NM"),
-
-            # 🗺 지도
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
-
-            # 📱 QR (홈페이지 접속)
             "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={BASE_URL}"
         }
 
@@ -70,15 +65,12 @@ def auto(q: str):
 
     try:
         data = res.json().get("schoolInfo")
-
         if not data:
             return {"data": []}
 
         rows = data[1].get("row", [])
 
-        return {
-            "data": [r.get("SCHUL_NM") for r in rows[:5]]
-        }
+        return {"data": [r.get("SCHUL_NM") for r in rows[:5]]}
 
     except:
         return {"data": []}
@@ -99,7 +91,7 @@ def api(name: str):
 
 
 # -----------------------------
-# HTML (이미지 UI 버전)
+# UI
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -109,141 +101,252 @@ def home():
 <html>
 <head>
 <meta charset="utf-8">
-<title>AI 학교 플랫폼</title>
+<title>AI School App</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 
-/* 🌄 네가 준 공부 이미지 배경 */
 body {
-    margin: 0;
-    font-family: sans-serif;
-
-    background: url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b') center/cover fixed;
+    margin:0;
+    font-family:sans-serif;
+    background:#f5f5f5;
+    transition:0.3s;
 }
 
-/* 🧊 메인 카드 */
+/* DARK MODE */
+.dark {
+    background:#111;
+    color:white;
+}
+
+/* BOX */
 .box {
-    width: 500px;
-    margin: 60px auto;
-    padding: 25px;
-
-    background: rgba(255,255,255,0.92);
-    border-radius: 18px;
-
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    text-align: center;
+    width:90%;
+    max-width:500px;
+    margin:20px auto;
+    padding:15px;
+    background:white;
+    border-radius:15px;
 }
 
+.dark .box {
+    background:#1e1e1e;
+}
+
+/* INPUT */
 input {
-    width: 80%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid #ccc;
+    width:80%;
+    padding:10px;
+    border-radius:10px;
 }
 
+/* BUTTON */
 button {
-    padding: 10px 20px;
-    margin-top: 10px;
-    border: none;
-    background: #4a90e2;
-    color: white;
-    border-radius: 10px;
-    cursor: pointer;
+    padding:10px;
+    margin:5px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
 }
 
-button:hover {
-    background: #357bd8;
+/* NAV */
+.nav {
+    position:fixed;
+    bottom:0;
+    left:0;
+    width:100%;
+    display:flex;
+    justify-content:space-around;
+    background:#222;
+    color:white;
+    padding:10px 0;
 }
 
-/* 📦 결과 카드 */
-.card {
-    margin-top: 20px;
-    padding: 15px;
-    background: white;
-    border-radius: 12px;
-    text-align: left;
-}
+.page { display:none; }
+.active { display:block; }
 
 .auto {
-    cursor: pointer;
-    color: #1a73e8;
+    cursor:pointer;
+    color:#1a73e8;
 }
+
 </style>
 </head>
 
 <body>
 
+<!-- 🔊 MUSIC -->
+<audio id="bgm" loop>
+<source src="https://cdn.pixabay.com/download/audio/2022/10/25/audio_3b7c2c3b6c.mp3">
+</audio>
+
+<!-- PAGE 1 -->
+<div id="home" class="page active">
 <div class="box">
 
-<h2>🏫 AI 학교 검색</h2>
+<h2>🏫 학교 검색</h2>
 
-<input id="name" oninput="auto()" placeholder="학교 이름 입력">
+<input id="name" oninput="auto()" placeholder="학교 입력">
+
 <br>
+
 <button onclick="search()">검색</button>
+<button onclick="addSchool()">➕ 추천 후보 추가</button>
+<button onclick="aiRecommend()">🤖 AI 추천</button>
 
 <div id="autoBox"></div>
 <div id="result"></div>
 
+<h4>📌 선택한 학교 리스트</h4>
+<div id="list"></div>
+
+</div>
+</div>
+
+<!-- PAGE 2 -->
+<div id="compare" class="page">
+<div class="box">
+<h2>📊 학교 비교</h2>
+<canvas id="chart"></canvas>
+</div>
+</div>
+
+<!-- PAGE 3 -->
+<div id="music" class="page">
+<div class="box">
+<h2>🔊 음악</h2>
+<button onclick="toggleMusic()">재생/정지</button>
+</div>
+</div>
+
+<!-- PAGE 4 -->
+<div id="settings" class="page">
+<div class="box">
+<h2>🎨 설정</h2>
+<button onclick="toggleDark()">다크모드</button>
+</div>
+</div>
+
+<!-- NAV -->
+<div class="nav">
+<button onclick="show('home')">홈</button>
+<button onclick="show('compare')">비교</button>
+<button onclick="show('music')">음악</button>
+<button onclick="show('settings')">설정</button>
 </div>
 
 <script>
 
-// 🔎 자동완성
-async function auto() {
+// ---------------- NAV ----------------
+function show(id){
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+}
+
+// ---------------- MUSIC ----------------
+let music = document.getElementById("bgm");
+let play = false;
+
+function toggleMusic(){
+    if(play) music.pause();
+    else music.play();
+    play = !play;
+}
+
+// ---------------- DARK ----------------
+function toggleDark(){
+    document.body.classList.toggle("dark");
+}
+
+// ---------------- AUTO ----------------
+async function auto(){
 
     const q = document.getElementById("name").value;
-
-    if (q.length < 2) return;
+    if(q.length < 2) return;
 
     const res = await fetch(`/auto?q=${q}`);
     const data = await res.json();
 
     document.getElementById("autoBox").innerHTML =
-        data.data.map(n => `
-            <p class="auto" onclick="select('${n}')">🔎 ${n}</p>
-        `).join("");
+        data.data.map(n =>
+            `<p class="auto" onclick="select('${n}')">🔎 ${n}</p>`
+        ).join("");
 }
 
-function select(name) {
-    document.getElementById("name").value = name;
+function select(n){
+    document.getElementById("name").value = n;
 }
 
-
-// 🔍 검색
-async function search() {
+// ---------------- SEARCH ----------------
+async function search(){
 
     const name = document.getElementById("name").value;
 
     const res = await fetch(`/api?name=${name}`);
     const data = await res.json();
 
-    const box = document.getElementById("result");
-
-    if (!data.result) {
-        box.innerHTML = "<p>검색 실패</p>";
+    if(!data.result){
+        document.getElementById("result").innerHTML = "❌ 실패";
         return;
     }
 
     const s = data.data;
 
-    box.innerHTML = `
-        <div class="card">
-
-            <h2>🏫 ${s.name}</h2>
-
-            <p>📍 ${s.address}</p>
-            <p>🏢 ${s.office}</p>
-            <p>🎓 ${s.type}</p>
-
-            <a href="${s.map}" target="_blank">🗺 지도 보기</a>
-
-            <br><br>
-
-            <img src="${s.qr}" style="width:150px">
-
+    document.getElementById("result").innerHTML = `
+        <div style="background:white;padding:10px;border-radius:10px">
+            <h3>${s.name}</h3>
+            <p>${s.address}</p>
         </div>
     `;
 }
+
+// ---------------- 선택 리스트 ----------------
+let schoolList = [];
+
+function addSchool(){
+
+    const name = document.getElementById("name").value;
+
+    if(name && !schoolList.includes(name)){
+        schoolList.push(name);
+    }
+
+    renderList();
+}
+
+// ---------------- 리스트 출력 ----------------
+function renderList(){
+
+    document.getElementById("list").innerHTML =
+        schoolList.map(s => `<p>📌 ${s}</p>`).join("");
+}
+
+// ---------------- AI 추천 (핵심 변경) ----------------
+function aiRecommend(){
+
+    if(schoolList.length === 0){
+        alert("학교를 먼저 추가해!");
+        return;
+    }
+
+    const pick = schoolList[Math.floor(Math.random()*schoolList.length)];
+
+    document.getElementById("result").innerHTML =
+        "🤖 추천 결과: <b>" + pick + "</b>";
+}
+
+// ---------------- CHART ----------------
+new Chart(document.getElementById("chart"), {
+    type:"bar",
+    data:{
+        labels:["전주고","상산고","과학고","풍남중"],
+        datasets:[{
+            label:"비교 점수",
+            data:[70,95,90,60]
+        }]
+    }
+});
 
 </script>
 
