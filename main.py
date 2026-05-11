@@ -2,26 +2,62 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import requests
 import os
-import qrcode
-from io import BytesIO
-import base64
 
 app = FastAPI()
 
-# React 연결 허용
+# CORS (React 연결용)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# 🔑 환경변수
 NEIS_KEY = os.getenv("NEIS_KEY")
 
 
-# -------------------------
-# 🔎 자동완성 (구글 느낌)
-# -------------------------
+# -----------------------------
+# 안전한 학교 검색 함수
+# -----------------------------
+def get_school(name: str):
+
+    url = "https://open.neis.go.kr/hub/schoolInfo"
+
+    res = requests.get(url, params={
+        "KEY": NEIS_KEY,
+        "Type": "json",
+        "SCHUL_NM": name
+    })
+
+    try:
+        data = res.json().get("schoolInfo")
+
+        if not data:
+            return None
+
+        rows = data[1].get("row", [])
+
+        if not rows:
+            return None
+
+        row = rows[0]
+
+        return {
+            "name": row.get("SCHUL_NM"),
+            "address": row.get("ORG_RDNMA"),
+            "office": row.get("ATPT_OFCDC_SC_NM"),
+            "type": row.get("SCHUL_KND_SC_NM")
+        }
+
+    except:
+        return None
+
+
+# -----------------------------
+# 자동완성 API
+# -----------------------------
 @app.get("/auto")
 def auto(q: str):
 
@@ -34,52 +70,38 @@ def auto(q: str):
     })
 
     try:
-        rows = res.json()["schoolInfo"][1]["row"]
-        return {"data": [r["SCHUL_NM"] for r in rows[:5]]}
+        data = res.json().get("schoolInfo")
+
+        if not data:
+            return {"data": []}
+
+        rows = data[1].get("row", [])
+
+        return {
+            "data": [r.get("SCHUL_NM") for r in rows[:5]]
+        }
+
     except:
         return {"data": []}
 
 
-# -------------------------
-# 🏫 학교 검색 + 이미지 + QR
-# -------------------------
+# -----------------------------
+# 검색 API
+# -----------------------------
 @app.get("/search")
 def search(q: str):
 
-    url = "https://open.neis.go.kr/hub/schoolInfo"
+    data = get_school(q)
 
-    res = requests.get(url, params={
-        "KEY": NEIS_KEY,
-        "Type": "json",
-        "SCHUL_NM": q
-    })
-
-    try:
-        rows = res.json()["schoolInfo"][1]["row"]
-
-        result = []
-
-        for r in rows:
-
-            # 📱 QR 생성
-            qr = qrcode.make(r["SCHUL_NM"])
-            buffer = BytesIO()
-            qr.save(buffer, format="PNG")
-            qr_b64 = base64.b64encode(buffer.getvalue()).decode()
-
-            # 🖼 이미지 (랜덤 교실 이미지)
-            img = f"https://source.unsplash.com/600x400/?school,classroom,{r['SCHUL_NM']}"
-
-            result.append({
-                "name": r["SCHUL_NM"],
-                "address": r["ORG_RDNMA"],
-                "office": r["ATPT_OFCDC_SC_NM"],
-                "type": r["SCHUL_KND_SC_NM"],
-                "img": img,
-                "qr": qr_b64
-            })
-
-        return {"data": result}
-
-    except:
+    if not data:
         return {"data": []}
+
+    return {"data": [data]}
+
+
+# -----------------------------
+# 기본 확인용
+# -----------------------------
+@app.get("/")
+def home():
+    return {"message": "School API Running"}
