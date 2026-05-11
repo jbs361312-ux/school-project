@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 export default function App() {
-
+ 
   const [q, setQ] = useState("");
   const [auto, setAuto] = useState([]);
   const [list, setList] = useState([]);
