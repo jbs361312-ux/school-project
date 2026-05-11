@@ -7,13 +7,11 @@ import urllib.parse
 app = FastAPI()
 
 NEIS_KEY = os.getenv("NEIS_KEY")
-
-# 🌐 너 사이트 주소 (여기만 꼭 바꿔!)
 BASE_URL = "https://school-project-lowd.onrender.com"
 
 
 # -----------------------------
-# 학교 정보 API
+# 학교 정보
 # -----------------------------
 def get_school(name: str):
 
@@ -48,7 +46,7 @@ def get_school(name: str):
             # 🗺 지도
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
 
-            # 📱 QR → 홈페이지 접속
+            # 📱 QR (홈페이지 접속)
             "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={BASE_URL}"
         }
 
@@ -57,7 +55,7 @@ def get_school(name: str):
 
 
 # -----------------------------
-# 자동완성 API
+# 자동완성
 # -----------------------------
 @app.get("/auto")
 def auto(q: str):
@@ -87,7 +85,7 @@ def auto(q: str):
 
 
 # -----------------------------
-# 검색 API
+# API
 # -----------------------------
 @app.get("/api")
 def api(name: str):
@@ -101,7 +99,7 @@ def api(name: str):
 
 
 # -----------------------------
-# HTML
+# HTML (이미지 UI 버전)
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -115,47 +113,60 @@ def home():
 
 <style>
 
+/* 🌄 네가 준 공부 이미지 배경 */
 body {
-    font-family: sans-serif;
     margin: 0;
-    height: 100vh;
+    font-family: sans-serif;
 
-    /* 🌄 공부 배경 */
-    background-image: url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
+    background: url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b') center/cover fixed;
 }
 
+/* 🧊 메인 카드 */
 .box {
-    background: rgba(255,255,255,0.92);
+    width: 500px;
+    margin: 60px auto;
     padding: 25px;
-    border-radius: 15px;
-    width: 450px;
-    margin: 50px auto;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+
+    background: rgba(255,255,255,0.92);
+    border-radius: 18px;
+
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    text-align: center;
 }
 
 input {
     width: 80%;
-    padding: 10px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
 }
 
 button {
     padding: 10px 20px;
     margin-top: 10px;
+    border: none;
+    background: #4a90e2;
+    color: white;
+    border-radius: 10px;
+    cursor: pointer;
 }
 
+button:hover {
+    background: #357bd8;
+}
+
+/* 📦 결과 카드 */
 .card {
     margin-top: 20px;
     padding: 15px;
     background: white;
-    border-radius: 10px;
+    border-radius: 12px;
+    text-align: left;
 }
 
 .auto {
     cursor: pointer;
-    color: blue;
+    color: #1a73e8;
 }
 </style>
 </head>
@@ -166,7 +177,7 @@ button {
 
 <h2>🏫 AI 학교 검색</h2>
 
-<input id="name" oninput="auto()" placeholder="학교 입력">
+<input id="name" oninput="auto()" placeholder="학교 이름 입력">
 <br>
 <button onclick="search()">검색</button>
 
@@ -228,7 +239,6 @@ async function search() {
 
             <br><br>
 
-            <!-- 📱 QR (홈페이지 접속) -->
             <img src="${s.qr}" style="width:150px">
 
         </div>
