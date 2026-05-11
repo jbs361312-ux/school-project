@@ -14,7 +14,7 @@ export default function App() {
 
     if (value.length < 2) return;
 
-    const res = await fetch(`https://YOUR_BACKEND_URL/auto?q=${value}`);
+    const res = await fetch(`https://school-api.onrender.com?q=${value}`);
     const data = await res.json();
 
     setAuto(data.data);
@@ -24,7 +24,7 @@ export default function App() {
   // 🔍 검색
   async function search() {
 
-    const res = await fetch(`https://YOUR_BACKEND_URL/search?q=${q}`);
+    const res = await fetch(`https://school-api.onrender.com?q=${q}`);
     const data = await res.json();
 
     setList(data.data);
