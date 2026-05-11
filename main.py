@@ -3,15 +3,15 @@ from fastapi.responses import HTMLResponse
 import requests
 import os
 import qrcode
-import base64
 from io import BytesIO
+import base64
 
 app = FastAPI()
 
 NEIS_KEY = os.getenv("NEIS_KEY")
 
 # -----------------------------
-# 학교 데이터 (전국 검색)
+# 학교 검색
 # -----------------------------
 def get_school(name):
 
@@ -25,24 +25,23 @@ def get_school(name):
 
     try:
         r = requests.get(url, params=params)
-        row = r.json()["schoolInfo"][1]["row"][0]
+        data = r.json()
 
-        return {
-            "name": row["SCHUL_NM"],
-            "address": row["ORG_RDNMA"],
-            "office": row["ATPT_OFCDC_SC_NM"],
-            "type": row["SCHUL_KND_SC_NM"]
-        }
+        if "schoolInfo" not in data:
+            return []
+
+        return data["schoolInfo"][1]["row"]
 
     except:
-        return None
+        return []
 
 
 # -----------------------------
-# QR 코드 생성
+# QR 생성
 # -----------------------------
-def make_qr(url):
-    img = qrcode.make(url)
+def make_qr(text):
+
+    img = qrcode.make(text)
 
     buffer = BytesIO()
     img.save(buffer, format="PNG")
@@ -51,7 +50,16 @@ def make_qr(url):
 
 
 # -----------------------------
-# 웹 UI
+# AI 이미지 (가짜 버전 - 안정용)
+# -----------------------------
+def ai_school_image(name):
+
+    # 실제 AI 대신 안정 이미지 (Render용)
+    return f"https://source.unsplash.com/600x400/?school,classroom,{name}"
+
+
+# -----------------------------
+# 메인 페이지
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -61,7 +69,7 @@ def home():
 <html>
 <head>
 <meta charset="utf-8">
-<title>학교 AI 시스템</title>
+<title>학교 AI 플랫폼</title>
 
 <style>
 body{
@@ -72,10 +80,10 @@ body{
 
 .card{
     background:white;
-    padding:20px;
     margin:20px auto;
-    width:400px;
-    border-radius:15px;
+    width:500px;
+    padding:20px;
+    border-radius:20px;
     box-shadow:0 10px 20px rgba(0,0,0,0.2);
 }
 
@@ -92,7 +100,7 @@ button{
 }
 
 img{
-    width:300px;
+    width:100%;
     border-radius:10px;
 }
 </style>
@@ -101,14 +109,43 @@ img{
 
 <body>
 
-<h1>🏫 AI 학교 검색 시스템</h1>
+<h1>🏫 AI 학교 플랫폼</h1>
 
-<input id="name" placeholder="학교 입력">
+<input id="name" oninput="auto()" placeholder="학교 입력">
 <button onclick="search()">검색</button>
 
+<div id="suggest"></div>
 <div id="result"></div>
 
 <script>
+
+let timer;
+
+// ---------------- 자동완성 ----------------
+function auto(){
+
+    clearTimeout(timer);
+
+    timer = setTimeout(async ()=>{
+
+        const name = document.getElementById("name").value;
+
+        if(name.length < 2) return;
+
+        const res = await fetch(`/api?name=${name}`);
+        const data = await res.json();
+
+        let box = document.getElementById("suggest");
+
+        if(data.data.length > 0){
+            box.innerHTML = "🔎 " + data.data[0].SCHUL_NM;
+        }
+
+    }, 300);
+}
+
+
+// ---------------- 검색 ----------------
 async function search(){
 
     const name = document.getElementById("name").value;
@@ -116,22 +153,37 @@ async function search(){
     const res = await fetch(`/api?name=${name}`);
     const data = await res.json();
 
-    if(data.result == "fail"){
-        document.getElementById("result").innerHTML = "검색 실패";
+    let box = document.getElementById("result");
+
+    if(data.data.length == 0){
+        box.innerHTML = "❌ 없음";
         return;
     }
 
-    document.getElementById("result").innerHTML = `
-        <div class="card">
-            <h2>${data.school.name}</h2>
-            <p>${data.school.address}</p>
-            <p>${data.school.office}</p>
-            <p>${data.school.type}</p>
+    let html = "";
 
-            <h3>📱 QR 접속</h3>
-            <img src="data:image/png;base64,${data.qr}">
+    data.data.forEach(s => {
+
+        html += `
+        <div class="card">
+            <h2>${s.SCHUL_NM}</h2>
+
+            <img src="${s.img}">
+
+            <p>📍 ${s.ORG_RDNMA}</p>
+
+            <p>
+            <a href="https://www.google.com/maps/search/${s.ORG_RDNMA}" target="_blank">
+            🗺 지도 보기
+            </a>
+            </p>
+
+            <img src="data:image/png;base64,${s.qr}">
         </div>
-    `;
+        `;
+    });
+
+    box.innerHTML = html;
 }
 </script>
 
@@ -146,18 +198,23 @@ async function search(){
 @app.get("/api")
 def api(name: str):
 
-    school = get_school(name)
+    schools = get_school(name)
 
-    if not school:
-        return {"result": "fail"}
+    result = []
 
-    # 현재 URL (Render 자동 대응)
-    url = "https://your-site.onrender.com/?school=" + name
+    for s in schools:
 
-    qr = make_qr(url)
+        url = "https://school.com/" + s["SCHUL_NM"]
+
+        qr = make_qr(url)
+        img = ai_school_image(s["SCHUL_NM"])
+
+        result.append({
+            **s,
+            "qr": qr,
+            "img": img
+        })
 
     return {
-        "result": "success",
-        "school": school,
-        "qr": qr
+        "data": result
     }
