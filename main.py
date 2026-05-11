@@ -1,27 +1,17 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 import requests
 import os
 
 app = FastAPI()
 
-# CORS (React 연결용)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 🔑 환경변수
 NEIS_KEY = os.getenv("NEIS_KEY")
 
 
 # -----------------------------
-# 안전한 학교 검색 함수
+# 학교 검색 함수
 # -----------------------------
-def get_school(name: str):
+def get_school(name):
 
     url = "https://open.neis.go.kr/hub/schoolInfo"
 
@@ -56,52 +46,117 @@ def get_school(name: str):
 
 
 # -----------------------------
-# 자동완성 API
+# HTML 페이지
 # -----------------------------
-@app.get("/auto")
-def auto(q: str):
+@app.get("/", response_class=HTMLResponse)
+def home():
 
-    url = "https://open.neis.go.kr/hub/schoolInfo"
+    return """
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>학교 검색</title>
 
-    res = requests.get(url, params={
-        "KEY": NEIS_KEY,
-        "Type": "json",
-        "SCHUL_NM": q
-    })
+<style>
+body {
+    font-family: sans-serif;
+    background: #f5f6fa;
+    text-align: center;
+    padding: 40px;
+}
 
-    try:
-        data = res.json().get("schoolInfo")
+.box {
+    background: white;
+    padding: 30px;
+    border-radius: 15px;
+    width: 400px;
+    margin: auto;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
 
-        if not data:
-            return {"data": []}
+input {
+    width: 80%;
+    padding: 10px;
+    margin-top: 10px;
+}
 
-        rows = data[1].get("row", [])
+button {
+    padding: 10px 20px;
+    margin-top: 10px;
+    cursor: pointer;
+}
 
-        return {
-            "data": [r.get("SCHUL_NM") for r in rows[:5]]
-        }
+.card {
+    margin-top: 20px;
+    padding: 15px;
+    background: #eef;
+    border-radius: 10px;
+}
+</style>
+</head>
 
-    except:
-        return {"data": []}
+<body>
+
+<div class="box">
+
+<h2>🏫 학교 검색</h2>
+
+<input id="name" placeholder="학교 이름 입력">
+<br>
+<button onclick="search()">검색</button>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+
+async function search() {
+
+    const name = document.getElementById("name").value;
+
+    const res = await fetch(`/api?name=${name}`);
+    const data = await res.json();
+
+    const box = document.getElementById("result");
+
+    if (!data.result) {
+        box.innerHTML = "<p>검색 실패</p>";
+        return;
+    }
+
+    const s = data.data;
+
+    box.innerHTML = `
+        <div class="card">
+            <h3>${s.name}</h3>
+            <p>📍 ${s.address}</p>
+            <p>🏢 ${s.office}</p>
+            <p>🎓 ${s.type}</p>
+        </div>
+    `;
+}
+
+</script>
+
+</body>
+</html>
+"""
 
 
 # -----------------------------
-# 검색 API
+# API
 # -----------------------------
-@app.get("/search")
-def search(q: str):
+@app.get("/api")
+def api(name: str):
 
-    data = get_school(q)
+    data = get_school(name)
 
     if not data:
-        return {"data": []}
+        return {"result": False}
 
-    return {"data": [data]}
-
-
-# -----------------------------
-# 기본 확인용
-# -----------------------------
-@app.get("/")
-def home():
-    return {"message": "School API Running"}
+    return {
+        "result": True,
+        "data": data
+    }
