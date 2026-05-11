@@ -8,7 +8,7 @@ import urllib.parse
 app = FastAPI()
 
 # 🎵 (선택) 음악/이미지 static
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 NEIS_KEY = os.getenv("NEIS_KEY")
 
