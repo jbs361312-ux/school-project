@@ -2,13 +2,21 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import requests
 import os
-import qrcode
-from io import BytesIO
-import base64
+import random
+
+# OpenAI (선택 기능)
+try:
+    from openai import OpenAI
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    USE_AI = True
+except:
+    USE_AI = False
+
 
 app = FastAPI()
 
 NEIS_KEY = os.getenv("NEIS_KEY")
+
 
 # -----------------------------
 # 학교 검색
@@ -24,7 +32,7 @@ def get_school(name):
     }
 
     try:
-        r = requests.get(url, params=params)
+        r = requests.get(url, params=params, timeout=10)
         data = r.json()
 
         if "schoolInfo" not in data:
@@ -37,29 +45,33 @@ def get_school(name):
 
 
 # -----------------------------
-# QR 생성
+# AI 이미지 생성
 # -----------------------------
-def make_qr(text):
+def generate_ai_image(name):
 
-    img = qrcode.make(text)
+    if USE_AI:
 
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
+        try:
+            prompt = f"modern korean high school classroom, {name}, realistic, bright lighting"
 
-    return base64.b64encode(buffer.getvalue()).decode()
+            res = client.images.generate(
+                model="gpt-image-1",
+                prompt=prompt,
+                size="1024x1024"
+            )
+
+            return res.data[0].url
+
+        except:
+            pass
+
+    # fallback (무료 이미지)
+    seed = random.randint(1, 9999)
+    return f"https://source.unsplash.com/600x400/?school,classroom,{name}&sig={seed}"
 
 
 # -----------------------------
-# AI 이미지 (가짜 버전 - 안정용)
-# -----------------------------
-def ai_school_image(name):
-
-    # 실제 AI 대신 안정 이미지 (Render용)
-    return f"https://source.unsplash.com/600x400/?school,classroom,{name}"
-
-
-# -----------------------------
-# 메인 페이지
+# 웹페이지
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -69,22 +81,38 @@ def home():
 <html>
 <head>
 <meta charset="utf-8">
-<title>학교 AI 플랫폼</title>
+<title>AI 학교 플랫폼</title>
 
 <style>
+
 body{
     font-family: Arial;
     background: linear-gradient(135deg,#74ebd5,#acb6e5);
     text-align:center;
 }
 
+/* 카드 애니메이션 */
 .card{
     background:white;
-    margin:20px auto;
     width:500px;
+    margin:20px auto;
     padding:20px;
     border-radius:20px;
     box-shadow:0 10px 20px rgba(0,0,0,0.2);
+    animation: fade 0.5s ease-in-out;
+}
+
+@keyframes fade{
+    from{opacity:0; transform:translateY(20px);}
+    to{opacity:1; transform:translateY(0);}
+}
+
+/* 이미지 슬라이드 */
+.slide{
+    width:100%;
+    height:250px;
+    border-radius:10px;
+    transition:0.5s;
 }
 
 input{
@@ -97,55 +125,51 @@ button{
     background:#4a90e2;
     color:white;
     border:none;
+    cursor:pointer;
 }
 
-img{
-    width:100%;
-    border-radius:10px;
+a{
+    text-decoration:none;
+    color:blue;
 }
+
 </style>
 
 </head>
 
 <body>
 
-<h1>🏫 AI 학교 플랫폼</h1>
+<h1>🤖 AI 학교 플랫폼</h1>
 
-<input id="name" oninput="auto()" placeholder="학교 입력">
+<input id="name" placeholder="학교 입력">
 <button onclick="search()">검색</button>
 
-<div id="suggest"></div>
 <div id="result"></div>
 
 <script>
 
-let timer;
+let images = [];
+let index = 0;
 
-// ---------------- 자동완성 ----------------
-function auto(){
+// 이미지 슬라이드
+function startSlide(imgList){
 
-    clearTimeout(timer);
+    images = imgList;
+    index = 0;
 
-    timer = setTimeout(async ()=>{
+    setInterval(()=>{
 
-        const name = document.getElementById("name").value;
-
-        if(name.length < 2) return;
-
-        const res = await fetch(`/api?name=${name}`);
-        const data = await res.json();
-
-        let box = document.getElementById("suggest");
-
-        if(data.data.length > 0){
-            box.innerHTML = "🔎 " + data.data[0].SCHUL_NM;
+        const img = document.getElementById("slideImg");
+        if(img && images.length > 0){
+            index = (index + 1) % images.length;
+            img.src = images[index];
         }
 
-    }, 300);
+    }, 2500);
 }
 
 
-// ---------------- 검색 ----------------
+// 검색
 async function search(){
 
     const name = document.getElementById("name").value;
@@ -153,24 +177,29 @@ async function search(){
     const res = await fetch(`/api?name=${name}`);
     const data = await res.json();
 
-    let box = document.getElementById("result");
+    const box = document.getElementById("result");
 
-    if(data.data.length == 0){
+    if(data.data.length === 0){
         box.innerHTML = "❌ 없음";
         return;
     }
 
     let html = "";
 
-    data.data.forEach(s => {
+    data.data.forEach((s, i)=>{
 
         html += `
         <div class="card">
+
             <h2>${s.SCHUL_NM}</h2>
 
-            <img src="${s.img}">
+            <img id="slideImg" class="slide" src="${s.images[0]}">
 
             <p>📍 ${s.ORG_RDNMA}</p>
+
+            <p>🏢 ${s.ATPT_OFCDC_SC_NM}</p>
+
+            <p>🎓 ${s.SCHUL_KND_SC_NM}</p>
 
             <p>
             <a href="https://www.google.com/maps/search/${s.ORG_RDNMA}" target="_blank">
@@ -178,13 +207,16 @@ async function search(){
             </a>
             </p>
 
-            <img src="data:image/png;base64,${s.qr}">
         </div>
         `;
+
+        startSlide(s.images);
+
     });
 
     box.innerHTML = html;
 }
+
 </script>
 
 </body>
@@ -204,17 +236,15 @@ def api(name: str):
 
     for s in schools:
 
-        url = "https://school.com/" + s["SCHUL_NM"]
-
-        qr = make_qr(url)
-        img = ai_school_image(s["SCHUL_NM"])
+        images = [
+            generate_ai_image(s["SCHUL_NM"]),
+            generate_ai_image(s["SCHUL_NM"] + " classroom"),
+            generate_ai_image(s["SCHUL_NM"] + " students")
+        ]
 
         result.append({
             **s,
-            "qr": qr,
-            "img": img
+            "images": images
         })
 
-    return {
-        "data": result
-    }
+    return {"data": result}
