@@ -1,19 +1,17 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 import requests
 import os
+import qrcode
+import base64
+from io import BytesIO
 
 app = FastAPI()
 
-# HTML 템플릿 (파일 없이도 동작하게 inline 방식 유지)
-templates = Jinja2Templates(directory=".")
-
-# 🔑 교육청 API 키 (Render 환경변수 사용 권장)
 NEIS_KEY = os.getenv("NEIS_KEY")
 
 # -----------------------------
-# 학교 정보 가져오기
+# 학교 데이터 (전국 검색)
 # -----------------------------
 def get_school(name):
 
@@ -26,16 +24,14 @@ def get_school(name):
     }
 
     try:
-        res = requests.get(url, params=params, timeout=10)
-        data = res.json()
-
-        row = data["schoolInfo"][1]["row"][0]
+        r = requests.get(url, params=params)
+        row = r.json()["schoolInfo"][1]["row"][0]
 
         return {
-            "name": row.get("SCHUL_NM"),
-            "address": row.get("ORG_RDNMA"),
-            "office": row.get("ATPT_OFCDC_SC_NM"),
-            "type": row.get("SCHUL_KND_SC_NM")
+            "name": row["SCHUL_NM"],
+            "address": row["ORG_RDNMA"],
+            "office": row["ATPT_OFCDC_SC_NM"],
+            "type": row["SCHUL_KND_SC_NM"]
         }
 
     except:
@@ -43,38 +39,49 @@ def get_school(name):
 
 
 # -----------------------------
-# 웹페이지
+# QR 코드 생성
+# -----------------------------
+def make_qr(url):
+    img = qrcode.make(url)
+
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+# -----------------------------
+# 웹 UI
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
 
     return """
 <!DOCTYPE html>
-<html lang="ko">
+<html>
 <head>
 <meta charset="utf-8">
-<title>학교 검색 API</title>
+<title>학교 AI 시스템</title>
 
 <style>
 body{
     font-family: Arial;
+    background: linear-gradient(135deg,#74ebd5,#acb6e5);
     text-align:center;
-    background:#f0f0f0;
-    margin-top:100px;
 }
 
-.box{
+.card{
     background:white;
-    padding:30px;
+    padding:20px;
+    margin:20px auto;
     width:400px;
-    margin:auto;
     border-radius:15px;
-    box-shadow:0 5px 20px rgba(0,0,0,0.2);
+    box-shadow:0 10px 20px rgba(0,0,0,0.2);
 }
 
 input{
     padding:10px;
-    width:70%;
+    width:60%;
 }
 
 button{
@@ -82,7 +89,11 @@ button{
     background:#4a90e2;
     color:white;
     border:none;
-    cursor:pointer;
+}
+
+img{
+    width:300px;
+    border-radius:10px;
 }
 </style>
 
@@ -90,16 +101,12 @@ button{
 
 <body>
 
-<div class="box">
+<h1>🏫 AI 학교 검색 시스템</h1>
 
-<h2>🏫 학교 검색</h2>
-
-<input id="name" placeholder="학교 이름">
+<input id="name" placeholder="학교 입력">
 <button onclick="search()">검색</button>
 
 <div id="result"></div>
-
-</div>
 
 <script>
 async function search(){
@@ -109,18 +116,21 @@ async function search(){
     const res = await fetch(`/api?name=${name}`);
     const data = await res.json();
 
-    const box = document.getElementById("result");
-
     if(data.result == "fail"){
-        box.innerHTML = "검색 실패";
+        document.getElementById("result").innerHTML = "검색 실패";
         return;
     }
 
-    box.innerHTML = `
-        <h3>${data.data.name}</h3>
-        <p>${data.data.address}</p>
-        <p>${data.data.office}</p>
-        <p>${data.data.type}</p>
+    document.getElementById("result").innerHTML = `
+        <div class="card">
+            <h2>${data.school.name}</h2>
+            <p>${data.school.address}</p>
+            <p>${data.school.office}</p>
+            <p>${data.school.type}</p>
+
+            <h3>📱 QR 접속</h3>
+            <img src="data:image/png;base64,${data.qr}">
+        </div>
     `;
 }
 </script>
@@ -136,12 +146,18 @@ async function search(){
 @app.get("/api")
 def api(name: str):
 
-    data = get_school(name)
+    school = get_school(name)
 
-    if not data:
+    if not school:
         return {"result": "fail"}
+
+    # 현재 URL (Render 자동 대응)
+    url = "https://your-site.onrender.com/?school=" + name
+
+    qr = make_qr(url)
 
     return {
         "result": "success",
-        "data": data
+        "school": school,
+        "qr": qr
     }
