@@ -14,9 +14,11 @@ export default function App() {
 
     if (value.length < 2) return;
 
-    const res = await fetch(`https://school-api.onrender.com?q=${value}`);
-    const data = await res.json();
+    const res = await fetch(
+      `https://school-api-lowd.onrender.com/auto?q=${value}`
+    );
 
+    const data = await res.json();
     setAuto(data.data);
   }
 
@@ -24,9 +26,11 @@ export default function App() {
   // 🔍 검색
   async function search() {
 
-    const res = await fetch(`https://school-api.onrender.com?q=${q}`);
-    const data = await res.json();
+    const res = await fetch(
+      `https://school-api-lowd.onrender.com/search?q=${q}`
+    );
 
+    const data = await res.json();
     setList(data.data);
   }
 
@@ -41,7 +45,7 @@ export default function App() {
 
       <h1>📱 AI 학교 플랫폼</h1>
 
-      {/* 검색창 */}
+      {/* 입력창 */}
       <input
         value={q}
         onChange={typing}
@@ -65,19 +69,23 @@ export default function App() {
 
       {/* 결과 */}
       {list.map((s, i) => (
-        <div key={i} style={{
-          margin: 15,
-          padding: 15,
-          borderRadius: 15,
-          background: "white",
-          boxShadow: "0 5px 15px rgba(0,0,0,0.1)"
-        }}>
+        <div
+          key={i}
+          style={{
+            margin: 15,
+            padding: 15,
+            borderRadius: 15,
+            background: "white",
+            boxShadow: "0 5px 15px rgba(0,0,0,0.1)"
+          }}
+        >
 
           <h2>🏫 {s.name}</h2>
 
           {/* 🖼 이미지 */}
           <img
             src={s.img}
+            alt="school"
             style={{ width: "100%", borderRadius: 10 }}
           />
 
@@ -89,6 +97,7 @@ export default function App() {
           <a
             href={`https://www.google.com/maps/search/${s.address}`}
             target="_blank"
+            rel="noreferrer"
           >
             🗺 지도 보기
           </a>
@@ -97,6 +106,7 @@ export default function App() {
           <div>
             <img
               src={`data:image/png;base64,${s.qr}`}
+              alt="qr"
               style={{ width: 120, marginTop: 10 }}
             />
           </div>
