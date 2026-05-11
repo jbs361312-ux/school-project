@@ -1,6 +1,6 @@
 fastapi
 uvicorn
 requests
-jinja2
+qrcode
+pillow
 python-dotenv
-openai
