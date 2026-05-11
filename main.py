@@ -41,8 +41,11 @@ def get_school(name: str):
             "address": address,
             "office": row.get("ATPT_OFCDC_SC_NM"),
             "type": row.get("SCHUL_KND_SC_NM"),
+
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
-            "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={BASE_URL}"
+
+            # 📱 QR 코드 (학교 페이지 or 앱 접속)
+            "qr": f"https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl={BASE_URL}/?school={urllib.parse.quote(name)}"
         }
 
     except:
@@ -91,7 +94,7 @@ def api(name: str):
 
 
 # -----------------------------
-# UI
+# HTML
 # -----------------------------
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -111,7 +114,6 @@ body {
     margin:0;
     font-family:sans-serif;
     background:#f5f5f5;
-    transition:0.3s;
 }
 
 /* DARK MODE */
@@ -120,7 +122,6 @@ body {
     color:white;
 }
 
-/* BOX */
 .box {
     width:90%;
     max-width:500px;
@@ -134,14 +135,12 @@ body {
     background:#1e1e1e;
 }
 
-/* INPUT */
 input {
     width:80%;
     padding:10px;
     border-radius:10px;
 }
 
-/* BUTTON */
 button {
     padding:10px;
     margin:5px;
@@ -150,7 +149,11 @@ button {
     cursor:pointer;
 }
 
-/* NAV */
+.auto {
+    cursor:pointer;
+    color:#1a73e8;
+}
+
 .nav {
     position:fixed;
     bottom:0;
@@ -166,11 +169,6 @@ button {
 .page { display:none; }
 .active { display:block; }
 
-.auto {
-    cursor:pointer;
-    color:#1a73e8;
-}
-
 </style>
 </head>
 
@@ -181,50 +179,36 @@ button {
 <source src="https://cdn.pixabay.com/download/audio/2022/10/25/audio_3b7c2c3b6c.mp3">
 </audio>
 
-<!-- PAGE 1 -->
+<!-- PAGE -->
 <div id="home" class="page active">
 <div class="box">
 
-<h2>🏫 학교 검색</h2>
+<h2>🏫 AI 학교 검색</h2>
 
 <input id="name" oninput="auto()" placeholder="학교 입력">
 
 <br>
 
 <button onclick="search()">검색</button>
-<button onclick="addSchool()">➕ 추천 후보 추가</button>
-<button onclick="aiRecommend()">🤖 AI 추천</button>
+<button onclick="addSchool()">➕ 추가</button>
+<button onclick="aiRecommend()">🤖 추천</button>
+<button onclick="toggleDark()">다크</button>
+<button onclick="toggleMusic()">음악</button>
 
 <div id="autoBox"></div>
 <div id="result"></div>
 
-<h4>📌 선택한 학교 리스트</h4>
+<h4>📌 선택 리스트</h4>
 <div id="list"></div>
 
 </div>
 </div>
 
-<!-- PAGE 2 -->
+<!-- GRAPH -->
 <div id="compare" class="page">
 <div class="box">
-<h2>📊 학교 비교</h2>
+<h2>📊 비교</h2>
 <canvas id="chart"></canvas>
-</div>
-</div>
-
-<!-- PAGE 3 -->
-<div id="music" class="page">
-<div class="box">
-<h2>🔊 음악</h2>
-<button onclick="toggleMusic()">재생/정지</button>
-</div>
-</div>
-
-<!-- PAGE 4 -->
-<div id="settings" class="page">
-<div class="box">
-<h2>🎨 설정</h2>
-<button onclick="toggleDark()">다크모드</button>
 </div>
 </div>
 
@@ -232,8 +216,6 @@ button {
 <div class="nav">
 <button onclick="show('home')">홈</button>
 <button onclick="show('compare')">비교</button>
-<button onclick="show('music')">음악</button>
-<button onclick="show('settings')">설정</button>
 </div>
 
 <script>
@@ -295,13 +277,22 @@ async function search(){
 
     document.getElementById("result").innerHTML = `
         <div style="background:white;padding:10px;border-radius:10px">
+
             <h3>${s.name}</h3>
             <p>${s.address}</p>
+
+            <a href="${s.map}" target="_blank">🗺 지도</a>
+
+            <br><br>
+
+            <!-- 📱 QR 코드 -->
+            <img src="${s.qr}" width="150">
+
         </div>
     `;
 }
 
-// ---------------- 선택 리스트 ----------------
+// ---------------- LIST ----------------
 let schoolList = [];
 
 function addSchool(){
@@ -315,25 +306,24 @@ function addSchool(){
     renderList();
 }
 
-// ---------------- 리스트 출력 ----------------
 function renderList(){
 
     document.getElementById("list").innerHTML =
         schoolList.map(s => `<p>📌 ${s}</p>`).join("");
 }
 
-// ---------------- AI 추천 (핵심 변경) ----------------
+// ---------------- AI 추천 ----------------
 function aiRecommend(){
 
     if(schoolList.length === 0){
-        alert("학교를 먼저 추가해!");
+        alert("학교 추가 먼저!");
         return;
     }
 
     const pick = schoolList[Math.floor(Math.random()*schoolList.length)];
 
     document.getElementById("result").innerHTML =
-        "🤖 추천 결과: <b>" + pick + "</b>";
+        "🤖 추천: <b>" + pick + "</b>";
 }
 
 // ---------------- CHART ----------------
@@ -342,7 +332,7 @@ new Chart(document.getElementById("chart"), {
     data:{
         labels:["전주고","상산고","과학고","풍남중"],
         datasets:[{
-            label:"비교 점수",
+            label:"점수",
             data:[70,95,90,60]
         }]
     }
