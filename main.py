@@ -42,9 +42,6 @@ def get_school(name: str):
             "office": row.get("ATPT_OFCDC_SC_NM"),
             "type": row.get("SCHUL_KND_SC_NM"),
 
-            # 🖼 이미지
-            "img": f"https://source.unsplash.com/600x400/?school,{name}",
-
             # 🗺 지도
             "map": f"https://www.google.com/maps/search/{urllib.parse.quote(address)}",
 
@@ -57,7 +54,7 @@ def get_school(name: str):
 
 
 # -----------------------------
-# 자동완성 API
+# 자동완성
 # -----------------------------
 @app.get("/auto")
 def auto(q: str):
@@ -87,7 +84,7 @@ def auto(q: str):
 
 
 # -----------------------------
-# 검색 API
+# API
 # -----------------------------
 @app.get("/api")
 def api(name: str):
@@ -114,20 +111,28 @@ def home():
 <title>AI 학교 플랫폼</title>
 
 <style>
+
+/* 🌄 고정 공부 배경 */
 body {
     font-family: sans-serif;
-    background: #f5f6fa;
-    text-align: center;
-    padding: 30px;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+
+    background-image: url('https://images.unsplash.com/photo-1503676260728-1c00da094a0b');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
+/* 반투명 카드 */
 .box {
-    background: white;
+    background: rgba(255,255,255,0.9);
     padding: 25px;
     border-radius: 15px;
     width: 450px;
-    margin: auto;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    margin: 50px auto;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
 
 input {
@@ -138,17 +143,13 @@ input {
 button {
     padding: 10px 20px;
     margin-top: 10px;
+    cursor: pointer;
 }
 
 .card {
     margin-top: 20px;
     padding: 15px;
-    background: #eef;
-    border-radius: 10px;
-}
-
-img {
-    width: 100%;
+    background: white;
     border-radius: 10px;
 }
 
@@ -186,11 +187,10 @@ async function auto() {
     const res = await fetch(`/auto?q=${q}`);
     const data = await res.json();
 
-    const box = document.getElementById("autoBox");
-
-    box.innerHTML = data.data.map(n => `
-        <p class="auto" onclick="select('${n}')">🔎 ${n}</p>
-    `).join("");
+    document.getElementById("autoBox").innerHTML =
+        data.data.map(n => `
+            <p class="auto" onclick="select('${n}')">🔎 ${n}</p>
+        `).join("");
 }
 
 function select(name) {
@@ -219,8 +219,6 @@ async function search() {
         <div class="card">
 
             <h2>🏫 ${s.name}</h2>
-
-            <img src="${s.img}">
 
             <p>📍 ${s.address}</p>
             <p>🏢 ${s.office}</p>
